@@ -34,3 +34,24 @@ inspect_df$ACTION <- as.factor(inspect_df$ACTION)
 inspect_df$COURT_OUTCOME <- as.character(inspect_df$COURT_OUTCOME)
 inspect_df$COURT_OUTCOME <- as.factor(inspect_df$COURT_OUTCOME)
 inspect_df$AMOUNT_FINED <- as.numeric(inspect_df$AMOUNT_FINED)
+
+## Create a list of all unique inspection IDs:
+sub_insp <- subset(inspect_df,select = ESTABLISHMENT_ID:ESTABLISHMENT_STATUS)
+inspect_unique <- unique(sub_insp)
+
+## Create a list of inspection IDs that resulted in either Significant (S) or Crucial (C) Severity.
+## Note: There may be duplicate inspection records in this list.
+inspect_SevCru <- inspect_df[inspect_df$SEVERITY %in% c("C - Crucial","S - Significant"),3]
+
+## Flag each of the unique inspections based on whether it resulted in a Significant or Crucial violation.
+Sev_Cru <- vector()
+for (i in 1:length(inspect_unique$INSPECTION_ID)){
+  if (inspect_unique$INSPECTION_ID[i] %in% inspect_SevCru){
+    Sev_Cru[i] <- T}
+  else{
+    Sev_Cru[i] <- F }}
+
+## Bind the unique inspection records with the Severity indicator.
+## We now have a list of unique inspections, flagged for whether or not they resulted in a Crucial or Significant violation.
+inspect_work <- as.data.frame(cbind(inspect_unique, Sev_Cru))
+sum(inspect_work$Sev_Cru)
