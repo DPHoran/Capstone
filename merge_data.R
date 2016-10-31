@@ -11,4 +11,4 @@ m1 <- merge(inspect_work,sub_lic, by.x = "name_addr", by.y = "name_addr")
 length(unique(m1$INSPECTION_ID))
 
 ## how many inspections did not result in an infraction?
-table(m1$SEVERITY)
+table(m1$Sev_Cru)
