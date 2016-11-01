@@ -8,7 +8,7 @@ sub_lic$name_addr <- paste(substr(sub_lic$Operating.Name,1,8),substr(sub_lic$Lic
 m1 <- merge(inspect_work,sub_lic, by.x = "name_addr", by.y = "name_addr")
 
 ## how many different establishments?
-length(unique(m1$INSPECTION_ID))
+length(unique(m1$ESTABLISHMENT_ID))
 
 ## how many inspections did not result in an infraction?
 table(m1$Sev_Cru)
