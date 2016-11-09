@@ -1,0 +1,142 @@
+---
+title: "Capstone - Toronto DineSafe Inspections"
+author: "David Horan"
+date: "November 8, 2016"
+output: html_document
+---
+
+Step 1: Load the data from the DineSafe inspection database. The data was sourced in XML format.
+
+```{r}
+## Create a dataframe from the XML data.
+library("XML")
+dinesafe.tmp <- "C:/Users/Jenn & Dave/Documents/Capstone/dinesafe.Sept17.xml"
+dinesafe <- xmlTreeParse(dinesafe.tmp)
+class(dinesafe)
+xmltop <- xmlRoot(dinesafe)
+inspections <- xmlSApply(xmltop, function(x) xmlSApply(x, xmlValue))
+inspect_df <- data.frame(t(inspections),row.names=NULL)
+
+```
+
+Step 2: Label the columns and set them to the appropriate data types.
+
+```{r}
+## Organize inspection data.
+colnames(inspect_df)
+inspect_df$ROW_ID <- as.numeric(inspect_df$ROW_ID)
+inspect_df$ESTABLISHMENT_ID <- as.numeric(inspect_df$ESTABLISHMENT_ID)
+inspect_df$ESTABLISHMENT_ID <- as.factor(inspect_df$ESTABLISHMENT_ID)
+inspect_df$INSPECTION_ID <- as.numeric(inspect_df$INSPECTION_ID)
+inspect_df$ESTABLISHMENT_NAME <- as.character(inspect_df$ESTABLISHMENT_NAME)
+inspect_df$ESTABLISHMENTTYPE <- as.character(inspect_df$ESTABLISHMENTTYPE)
+inspect_df$ESTABLISHMENTTYPE <- as.factor(inspect_df$ESTABLISHMENTTYPE)
+inspect_df$ESTABLISHMENT_ADDRESS <- as.character(inspect_df$ESTABLISHMENT_ADDRESS)
+inspect_df$ESTABLISHMENT_ADDRESS <- as.factor(inspect_df$ESTABLISHMENT_ADDRESS)
+inspect_df$ESTABLISHMENT_STATUS <- as.character(inspect_df$ESTABLISHMENT_STATUS)
+inspect_df$ESTABLISHMENT_STATUS <- as.factor(inspect_df$ESTABLISHMENT_STATUS)
+inspect_df$MINIMUM_INSPECTIONS_PERYEAR <- as.numeric(inspect_df$MINIMUM_INSPECTIONS_PERYEAR)
+inspect_df$MINIMUM_INSPECTIONS_PERYEAR <- as.factor(inspect_df$MINIMUM_INSPECTIONS_PERYEAR)
+inspect_df$INFRACTION_DETAILS <- as.character(inspect_df$INFRACTION_DETAILS)
+inspect_df$INFRACTION_DETAILS <- as.factor(inspect_df$INFRACTION_DETAILS)
+inspect_df$INSPECTION_DATE <- as.character(inspect_df$INSPECTION_DATE)
+inspect_df$INSPECTION_DATE <- as.Date(inspect_df$INSPECTION_DATE)
+inspect_df$SEVERITY <- as.character(inspect_df$SEVERITY)
+inspect_df$SEVERITY <- as.factor(inspect_df$SEVERITY)
+inspect_df$ACTION <- as.character(inspect_df$ACTION)
+inspect_df$ACTION <- as.factor(inspect_df$ACTION)
+inspect_df$COURT_OUTCOME <- as.character(inspect_df$COURT_OUTCOME)
+inspect_df$COURT_OUTCOME <- as.factor(inspect_df$COURT_OUTCOME)
+inspect_df$AMOUNT_FINED <- as.numeric(inspect_df$AMOUNT_FINED)
+
+## View a sample of the data.
+head(inspect_df)
+
+```
+
+Step 3: Create a list of all unique inspection IDs.
+
+```{r}
+sub_insp <- subset(inspect_df,select = c(ESTABLISHMENT_ID:MINIMUM_INSPECTIONS_PERYEAR,INSPECTION_DATE))
+inspect_unique <- unique(sub_insp)
+
+head(inspect_unique)
+
+```
+
+Step 4: Create a list of inspection IDs that resulted in either Significant (S) or Crucial (C) severity.
+
+```{r}
+inspect_SevCru <- inspect_df[inspect_df$SEVERITY %in% c("C - Crucial","S - Significant"),3]
+
+## Flag each of the unique inspections based on whether it resulted in a Significant or Crucial violation.
+Sev_Cru <- vector()
+for (i in 1:length(inspect_unique$INSPECTION_ID)){
+  if (inspect_unique$INSPECTION_ID[i] %in% inspect_SevCru){
+    Sev_Cru[i] <- T}
+  else{
+    Sev_Cru[i] <- F }}
+
+## Bind the unique inspection records with the Severity indicator.
+inspect_work <- as.data.frame(cbind(inspect_unique, Sev_Cru))
+
+head(inspect_work)
+
+```
+
+We now have a list of unique inspections, flagged for whether or not they resulted in a Crucial or Significant violation.
+
+Step 5: Add another potential explanatory variable: Month. This is a plausible variable, because there may be seasonal factors driving the inspection results.
+
+```{r}
+inspect_work$MONTH <- months(inspect_work$INSPECTION_DATE)
+```
+
+Step 6a: Check for complete cases:
+
+```{r}
+cc_test <- complete.cases(inspect_work)
+length(which(cc_test == F))
+```
+
+Result: It appears that there are no incomplete cases in the remaining data.
+
+
+Step 6b: Preliminary data analysis: 
+
+```{r}
+## Percentage of inspections resulting in a Significant or Crucial Health Violation.
+nrow(inspect_work[Sev_Cru == 1,])/nrow(inspect_work)
+
+```
+
+Result: Approximately 22% of inspections resulted in a Significant or Crucial Health Violation.
+
+
+Step 6c: Next, we will visualize the percentage of significant / crucial violations across the following categorical variables:
+
+```{r}
+## (i) Establishment Type
+barplot(sort(table(inspect_work[Sev_Cru == 1,]$ESTABLISHMENTTYPE)/table(inspect_work$ESTABLISHMENTTYPE), decreasing = F), cex.names = 0.8)
+## (ii) Minimum Inspections per Year
+barplot(table(inspect_work[Sev_Cru == 1,]$MINIMUM_INSPECTIONS_PERYEAR)/table(inspect_work$MINIMUM_INSPECTIONS_PERYEAR))
+## (iii) Month of Inspection
+barplot(table(inspect_work[Sev_Cru == 1,]$MONTH)/table(inspect_work$MONTH), cex.names = 0.8)
+
+```
+
+Results:
+(i) The appears to be some disparity in the rate of violations across Establishment Type.
+(ii) Interestingly, the establisments that require 3 inspections per year also showed the highest incidence of Significant and Critical health violations. This makes intuitive sense, given that these are typically higher risk establishments.
+(iii) There does appear to be some variation in the incidence of violations by month.
+
+
+Step 7: Begin creating a logistic regression to evaluate the explanatory value of different variables on Significant and Crucial violations.
+
+```{r}
+glm_insp <- glm(Sev_Cru~ESTABLISHMENTTYPE+MINIMUM_INSPECTIONS_PERYEAR+MONTH,data = inspect_work, family = binomial("logit"))
+
+summary(glm_insp)
+
+```
+
